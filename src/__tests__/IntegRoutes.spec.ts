@@ -3,9 +3,11 @@ import request from 'supertest'
 import { app } from '../app'
 import { Connection, createConnection } from "typeorm"
 
+  // setup public test variables and timeout value
 jest.setTimeout(15000)
 let connection: Connection;
 
+    // stablish connections and setup tables
 beforeAll(async () => {
   connection = await createConnection();
   await connection.dropDatabase();
