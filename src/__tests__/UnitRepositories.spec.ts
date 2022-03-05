@@ -11,93 +11,94 @@ import { Statement } from '../modules/statements/entities/Statement';
 import { UsersRepository } from '../modules/users/repositories/UsersRepository';
 import { StatementsRepository } from '../modules/statements/repositories/StatementsRepository';
 
+// setup public test variables
+let connection: Connection;
 
-describe('Repositories', () => {
-  // setup public test variables
-  let connection: Connection;
+let ormUsersRepository: Repository<User>;
+let ormStatementsRepository: Repository<Statement>;
 
-  let ormUsersRepository: Repository<User>;
-  let ormStatementsRepository: Repository<Statement>;
+let usersRepository: UsersRepository;
+let statementsRepository: StatementsRepository;
 
-  let usersRepository: UsersRepository;
-  let statementsRepository: StatementsRepository;
+let seededUsers: User[];
+let seededStatements: Statement[];
 
-  let seededUsers: User[];
-  let seededStatements: Statement[];
+enum OperationType {
+  DEPOSIT = 'deposit',
+  WITHDRAW = 'withdraw',
+  TRANSFER = 'transfer',
+}
 
-  enum OperationType {
-    DEPOSIT = 'deposit',
-    WITHDRAW = 'withdraw',
-    TRANSFER = 'transfer',
+beforeAll(async () => {
+  // stablish connections and setup tables
+  connection = await createConnection();
+
+
+  await connection.dropDatabase();
+  await connection.runMigrations();
+
+  // setup repositories
+  ormUsersRepository = getRepository(User);
+  ormStatementsRepository = getRepository(Statement);
+
+  usersRepository = new UsersRepository();
+  statementsRepository = new StatementsRepository();
+
+  // seed users
+  const usersToSeed = ormUsersRepository.create([
+    {
+      name: 'Cammy figher',
+      email: 'cammy@gmail.com',
+      password: '123456',
+    },
+    {
+      name: 'Ken figher',
+      email: 'ken@gmail.com',
+      password: '123456',
+    },
+    {
+      name: 'Sakura figher',
+      email: 'sakura@gmail.com',
+      password: '123456',
+    },
+    {
+      name: 'Ryu figher',
+      email: 'ryu@gmail.com',
+      password: '123456',
+    },
+  ]);
+
+  seededUsers = await ormUsersRepository.save(usersToSeed);
+  if (!seededUsers) {
+    throw new Error('User not seeded');
   }
 
-  beforeAll(async () => {
-    // stablish connections and setup tables
-    connection = await createConnection();
+  // seed statements
+  const statementsToSeed = ormStatementsRepository.create([
+    {
+      user_id: seededUsers[1].id,
+      amount: 100,
+      description: 'deposit',
+      type: OperationType.DEPOSIT,
+    },
+    {
+      user_id: seededUsers[1].id,
+      amount: 20,
+      description: 'withdraw',
+      type: OperationType.WITHDRAW,
+    },
+  ]);
 
-    ormUsersRepository = getRepository(User);
-    ormStatementsRepository = getRepository(Statement);
+  seededStatements = await ormStatementsRepository.save(statementsToSeed);
 
-    usersRepository = new UsersRepository();
-    statementsRepository = new StatementsRepository();
+});
 
-    await connection.dropDatabase();
-    await connection.runMigrations();
+afterAll(async () => {
+  await connection.dropDatabase();
+  await connection.close();
+});
 
-
-    // seed users
-    const usersToSeed = ormUsersRepository.create([
-      {
-        name: 'Cammy figher',
-        email: 'cammy@gmail.com',
-        password: '123456',
-      },
-      {
-        name: 'Ken figher',
-        email: 'ken@gmail.com',
-        password: '123456',
-      },
-      {
-        name: 'Sakura figher',
-        email: 'sakura@gmail.com',
-        password: '123456',
-      },
-      {
-        name: 'Ryu figher',
-        email: 'ryu@gmail.com',
-        password: '123456',
-      },
-    ]);
-
-    seededUsers = await ormUsersRepository.save(usersToSeed);
-    if (!seededUsers) {
-      throw new Error('User not seeded');
-    }
-
-    // seed statements
-    const statementsToSeed = ormStatementsRepository.create([
-      {
-        user_id: seededUsers[1].id,
-        amount: 100,
-        description: 'deposit',
-        type: OperationType.DEPOSIT,
-      },
-      {
-        user_id: seededUsers[1].id,
-        amount: 20,
-        description: 'withdraw',
-        type: OperationType.WITHDRAW,
-      },
-    ]);
-
-    seededStatements = await ormStatementsRepository.save(statementsToSeed);
-
-  });
-
-  afterAll(async () => {
-    await connection.dropDatabase();
-    await connection.close();
-  });
+describe('Repositories', () => {
 
   describe("[UsersRepository]", () => {
     it("should be able to create user by passing name, email and password", async () => {
