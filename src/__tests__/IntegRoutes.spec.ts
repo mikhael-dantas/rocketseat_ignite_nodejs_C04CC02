@@ -1,15 +1,53 @@
 import request from 'supertest'
 
 import { app } from '../app'
-import { Connection, createConnection } from "typeorm"
+import {
+  Connection, createConnection, getRepository, Repository,
+} from 'typeorm';
 
-  // setup public it variables and timeout value
+import { User } from '../modules/users/entities/User';
+import { Statement } from '../modules/statements/entities/Statement';
+
+import { hash } from 'bcryptjs';
+import { sign } from 'jsonwebtoken';
+
+// setup public it variables and timeout value
 jest.setTimeout(15000)
 let connection: Connection;
 
-    // stablish connections and setup tables
+// setup public test variables for repositories
+let ormUsersRepository: Repository<User>;
+let ormStatementsRepository: Repository<Statement>;
+
+async function createUserFromOrm(user: { name: string, email: string, password: string }) {
+  const passwordHash = await hash(user.password, 8);
+  const userToCreate = {
+    name: user.name,
+    email: user.email,
+    password: passwordHash
+  }
+  return await ormUsersRepository.save(ormUsersRepository.create(userToCreate));
+}
+
+async function getTokenFromOrmUser(user: User) {
+  return sign({ user }, process.env.JWT_SECRET as string, {
+    subject: user.id,
+    expiresIn: '1d',
+  });
+}
+
+// stablish connections and setup tables
 beforeAll(async () => {
   connection = await createConnection();
+  await connection.dropDatabase();
+  await connection.runMigrations();
+
+  // setup repositories
+  ormUsersRepository = getRepository(User);
+  ormStatementsRepository = getRepository(Statement);
+});
+
+beforeEach(async () => {
   await connection.dropDatabase();
   await connection.runMigrations();
 });
@@ -18,6 +56,7 @@ afterAll(async () => {
   await connection.dropDatabase();
   await connection.close();
 });
+
 
 describe("[/users]", () => {
 
@@ -31,7 +70,7 @@ describe("[/users]", () => {
     expect(response.status).toBe(201)
   })
 
-  it("Should be able to create a user by sending name, email and password", async () => {
+  it("Should not be able to create a user by sending wrong name, email and password", async () => {
     const response = await request(app).post("/api/v1/users").send({
       email: "john@gmail.com",
       password: "123456"
@@ -47,9 +86,12 @@ describe("[/users]", () => {
       email: "john@gmail.com",
     });
 
-    expect(response.status).toBe(400)
-    expect(response2.status).toBe(500)
-    expect(response3.status).toBe(400)
+    expect(response.status).not.toBe(201)
+    expect(response.status).not.toBe(200)
+    expect(response2.status).not.toBe(201)
+    expect(response2.status).not.toBe(200)
+    expect(response3.status).not.toBe(201)
+    expect(response3.status).not.toBe(200)
   })
 
 })
@@ -63,7 +105,7 @@ describe("[/sessions]", () => {
       password: "123456"
     }
 
-    await request(app).post("/api/v1/users").send(user);
+    await createUserFromOrm(user);
 
     const response = await request(app).post("/api/v1/sessions").send({
       email: user.email,
@@ -82,7 +124,7 @@ describe("[/sessions]", () => {
       password: "123456"
     }
 
-    await request(app).post("/api/v1/users").send(user);
+    await createUserFromOrm(user);
 
     const response = await request(app).post("/api/v1/sessions").send({
       email: user.email,
@@ -101,9 +143,8 @@ describe("[/profile]", () => {
       email: String(Math.random()) + "@gmail.com",
       password: "123456"
     }
-    await request(app).post("/api/v1/users").send(userToCreate);
-    const sessionResponse = await request(app).post("/api/v1/sessions").send(userToCreate);
-    const token = sessionResponse.body.token;
+    const createdUser = await createUserFromOrm(userToCreate);
+    const token = await getTokenFromOrmUser(createdUser);
 
     const response = await request(app).get("/api/v1/profile").set("Authorization", `Bearer ${token}`);
 
@@ -125,9 +166,9 @@ describe("[/statements]", () => {
       email: String(Math.random()) + "@gmail.com",
       password: "123456"
     }
-    await request(app).post("/api/v1/users").send(userToCreate);
-    const sessionResponse = await request(app).post("/api/v1/sessions").send(userToCreate);
-    const token = sessionResponse.body.token;
+
+    const createdUser = await createUserFromOrm(userToCreate);
+    const token = await getTokenFromOrmUser(createdUser);
 
     const response = await request(app).post("/api/v1/statements/deposit").set("Authorization", `Bearer ${token}`).send({
       amount: 100,
@@ -151,9 +192,9 @@ describe("[/statements]", () => {
       email: String(Math.random()) + "@gmail.com",
       password: "123456"
     }
-    await request(app).post("/api/v1/users").send(userToCreate);
-    const sessionResponse = await request(app).post("/api/v1/sessions").send(userToCreate);
-    const token = sessionResponse.body.token;
+
+    const createdUser = await createUserFromOrm(userToCreate);
+    const token = await getTokenFromOrmUser(createdUser);
 
     await request(app).post("/api/v1/statements/deposit").set("Authorization", `Bearer ${token}`).send({
       amount: 100,
@@ -182,9 +223,9 @@ describe("[/statements]", () => {
       email: String(Math.random()) + "@gmail.com",
       password: "123456"
     }
-    await request(app).post("/api/v1/users").send(userToCreate);
-    const sessionResponse = await request(app).post("/api/v1/sessions").send(userToCreate);
-    const token = sessionResponse.body.token;
+
+    const createdUser = await createUserFromOrm(userToCreate);
+    const token = await getTokenFromOrmUser(createdUser);
 
     await request(app).post("/api/v1/statements/deposit").set("Authorization", `Bearer ${token}`).send({
       amount: 100,
@@ -205,9 +246,9 @@ describe("[/statements]", () => {
       email: String(Math.random()) + "@gmail.com",
       password: "123456"
     }
-    await request(app).post("/api/v1/users").send(userToCreate);
-    const sessionResponse = await request(app).post("/api/v1/sessions").send(userToCreate);
-    const token = sessionResponse.body.token;
+
+    const createdUser = await createUserFromOrm(userToCreate);
+    const token = await getTokenFromOrmUser(createdUser);
 
     await request(app).post("/api/v1/statements/deposit").set("Authorization", `Bearer ${token}`).send({
       amount: 100,
@@ -232,14 +273,10 @@ describe("[/statements]", () => {
       password: "123456"
     }
 
-    await request(app).post("/api/v1/users").send(userToCreate);
-    await request(app).post("/api/v1/users").send(userToCreate2);
+    const createdUser = await createUserFromOrm(userToCreate);
+    const token = await getTokenFromOrmUser(createdUser);
 
-    const sessionResponse = await request(app).post("/api/v1/sessions").send(userToCreate);
-    const token = sessionResponse.body.token;
-
-    const sessionResponse2 = await request(app).post("/api/v1/sessions").send(userToCreate2);
-    const user2Id = sessionResponse2.body.user.id;
+    const {id: user2Id } = await createUserFromOrm(userToCreate2);
 
     await request(app).post("/api/v1/statements/deposit").set("Authorization", `Bearer ${token}`).send({
       amount: 200,
@@ -273,9 +310,9 @@ describe("[/statements]", () => {
       email: String(Math.random()) + "@gmail.com",
       password: "123456"
     }
-    await request(app).post("/api/v1/users").send(userToCreate);
-    const sessionResponse = await request(app).post("/api/v1/sessions").send(userToCreate);
-    const token = sessionResponse.body.token;
+
+    const createdUser = await createUserFromOrm(userToCreate);
+    const token = await getTokenFromOrmUser(createdUser);
 
     const statementCreationResponse = await request(app).post("/api/v1/statements/deposit").set("Authorization", `Bearer ${token}`).send({
       amount: 100,
@@ -308,16 +345,11 @@ describe("[/statements]", () => {
       email: String(Math.random()) + "@gmail.com",
       password: "123456"
     }
+    const createdUser = await createUserFromOrm(userToCreate);
+    const token = await getTokenFromOrmUser(createdUser);
+    const userId = createdUser.id;
 
-    await request(app).post("/api/v1/users").send(userToCreate);
-    await request(app).post("/api/v1/users").send(userToCreate2);
-
-    const sessionResponse = await request(app).post("/api/v1/sessions").send(userToCreate);
-    const token = sessionResponse.body.token;
-    const userId = sessionResponse.body.user.id;
-
-    const sessionResponse2 = await request(app).post("/api/v1/sessions").send(userToCreate2);
-    const user2Id = sessionResponse2.body.user.id;
+    const {id: user2Id} = await createUserFromOrm(userToCreate2);
 
     await request(app).post("/api/v1/statements/deposit").set("Authorization", `Bearer ${token}`).send({
       amount: 100,
