@@ -28,6 +28,7 @@ describe('Repositories', () => {
   enum OperationType {
     DEPOSIT = 'deposit',
     WITHDRAW = 'withdraw',
+    TRANSFER = 'transfer',
   }
 
   beforeAll(async () => {
@@ -144,46 +145,6 @@ describe('Repositories', () => {
   })
 
   describe("[StatementsRepository]", () => {
-    it('should be able to create statement by passing user_id, amount, description and type', async () => {
-      const userId = seededUsers[0].id;
-      if (!userId) {
-        throw new Error('User id not found in seeded users');
-      }
-
-      const createdStatement = await statementsRepository.create({
-        user_id: userId,
-        amount: 500,
-        description: 'Statement description',
-        type: OperationType.DEPOSIT,
-      });
-
-
-      expect(createdStatement).toBeTruthy();
-      expect(createdStatement).toMatchObject({
-        user_id: seededUsers[0].id,
-        amount: 500,
-        description: 'Statement description',
-        type: OperationType.DEPOSIT,
-      });
-    });
-
-    it('should be able to find statement operation by passing id and user_id', async () => {
-      const statementIdToFind = seededStatements[0].id;
-      const statementUserIdToFind = seededStatements[0].user_id;
-      if (!statementIdToFind) {
-        throw new Error('Statement id not found in seeded statements');
-      }
-
-      const foundStatement = await statementsRepository.findStatementOperation({
-        statement_id: statementIdToFind,
-        user_id: statementUserIdToFind,
-      });
-
-      expect(foundStatement).toBeTruthy();
-      expect(foundStatement).toMatchObject({
-        id: statementIdToFind,
-      });
-    });
 
     it('should be able to get user balance by passing user_id and optional statement boolean', async () => {
       const userId = seededUsers[1].id;
@@ -209,6 +170,81 @@ describe('Repositories', () => {
         balance: 80,
       });
       expect(userBalance2).toHaveProperty("statement")
+    });
+
+    it('should be able to create statement by passing user_id, amount, description and type', async () => {
+      const userId = seededUsers[0].id;
+      if (!userId) {
+        throw new Error('User id not found in seeded users');
+      }
+
+      const createdStatement = await statementsRepository.create({
+        user_id: userId,
+        amount: 500,
+        description: 'Statement description',
+        type: OperationType.DEPOSIT,
+      });
+
+      expect(createdStatement).toBeTruthy();
+      expect(createdStatement).toMatchObject({
+        user_id: seededUsers[0].id,
+        amount: 500,
+        description: 'Statement description',
+        type: OperationType.DEPOSIT,
+      });
+    });
+
+    it('should be able to create transfer statement by passing user_id, amount, description, type and sender_id', async () => {
+      const userSenderId = seededUsers[0].id;
+      const userReceiverId = seededUsers[1].id;
+      if (!userReceiverId) {
+        throw new Error('User id not found in seeded users');
+      }
+      if (!userSenderId) {
+        throw new Error('User id not found in seeded users');
+      }
+
+      await statementsRepository.create({
+        user_id: userSenderId,
+        amount: 500,
+        description: 'Statement description',
+        type: OperationType.DEPOSIT,
+      });
+
+      const createdStatement = await statementsRepository.create({
+        user_id: userReceiverId,
+        sender_id: userSenderId,
+        amount: 500,
+        description: 'Statement description',
+        type: OperationType.TRANSFER,
+      });
+
+
+      expect(createdStatement).toBeTruthy();
+      expect(createdStatement).toMatchObject({
+        user_id: userReceiverId,
+        amount: 500,
+        description: 'Statement description',
+        type: "transfer",
+      });
+    });
+
+    it('should be able to find statement operation by passing id and user_id', async () => {
+      const statementIdToFind = seededStatements[0].id;
+      const statementUserIdToFind = seededStatements[0].user_id;
+      if (!statementIdToFind) {
+        throw new Error('Statement id not found in seeded statements');
+      }
+
+      const foundStatement = await statementsRepository.findStatementOperation({
+        statement_id: statementIdToFind,
+        user_id: statementUserIdToFind,
+      });
+
+      expect(foundStatement).toBeTruthy();
+      expect(foundStatement).toMatchObject({
+        id: statementIdToFind,
+      });
     });
   });
 });
