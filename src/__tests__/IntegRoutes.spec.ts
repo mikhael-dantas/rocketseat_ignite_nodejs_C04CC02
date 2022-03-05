@@ -3,7 +3,7 @@ import request from 'supertest'
 import { app } from '../app'
 import { Connection, createConnection } from "typeorm"
 
-  // setup public test variables and timeout value
+  // setup public it variables and timeout value
 jest.setTimeout(15000)
 let connection: Connection;
 
@@ -21,7 +21,7 @@ afterAll(async () => {
 
 describe("[/users]", () => {
 
-  test("Should be able to create a user by sending name, email and password", async () => {
+  it("Should be able to create a user by sending name, email and password", async () => {
     const response = await request(app).post("/api/v1/users").send({
       name: "John Doe",
       email: "john@gmail.com",
@@ -31,7 +31,7 @@ describe("[/users]", () => {
     expect(response.status).toBe(201)
   })
 
-  test("Should be able to create a user by sending name, email and password", async () => {
+  it("Should be able to create a user by sending name, email and password", async () => {
     const response = await request(app).post("/api/v1/users").send({
       email: "john@gmail.com",
       password: "123456"
@@ -56,7 +56,7 @@ describe("[/users]", () => {
 
 describe("[/sessions]", () => {
 
-  test("Should be able to authenticate a user by sending email and password", async () => {
+  it("Should be able to authenticate a user by sending email and password", async () => {
     const user = {
       name: String(Math.random()),
       email: String(Math.random()) + "@gmail.com",
@@ -75,7 +75,7 @@ describe("[/sessions]", () => {
     expect(response.body.user.name).toBe(user.name);
   })
 
-  test("Should not be able to authenticate a user by sending email and wrong password", async () => {
+  it("Should not be able to authenticate a user by sending email and wrong password", async () => {
     const user = {
       name: String(Math.random()),
       email: String(Math.random()) + "@gmail.com",
@@ -95,7 +95,7 @@ describe("[/sessions]", () => {
 })
 
 describe("[/profile]", () => {
-  test("Should be able to get a user's profile", async () => {
+  it("Should be able to get a user's profile", async () => {
     const userToCreate = {
       name: String(Math.random()),
       email: String(Math.random()) + "@gmail.com",
@@ -111,7 +111,7 @@ describe("[/profile]", () => {
     expect(response.body.name).toBe(userToCreate.name);
   })
 
-  test("Should not be able to get a user's profile without token", async () => {
+  it("Should not be able to get a user's profile without token", async () => {
     const response = await request(app).get("/api/v1/profile");
 
     expect(response.status).toBe(401);
@@ -119,7 +119,7 @@ describe("[/profile]", () => {
 })
 
 describe("[/statements]", () => {
-  test("Should be able to create a deposit statement", async () => {
+  it("Should be able to create a deposit statement", async () => {
     const userToCreate = {
       name: String(Math.random()),
       email: String(Math.random()) + "@gmail.com",
@@ -137,7 +137,7 @@ describe("[/statements]", () => {
     expect(response.status).toBe(201);
   })
 
-  test("Should not be able to create a deposit statement without token", async () => {
+  it("Should not be able to create a deposit statement without token", async () => {
     const response = await request(app).post("/api/v1/statements/deposit").send({
       amount: 100,
       description: "deposit",
@@ -145,7 +145,7 @@ describe("[/statements]", () => {
     expect(response.status).toBe(401);
   })
 
-  test("Should be able to create a withdraw statement", async () => {
+  it("Should be able to create a withdraw statement", async () => {
     const userToCreate = {
       name: String(Math.random()),
       email: String(Math.random()) + "@gmail.com",
@@ -168,7 +168,7 @@ describe("[/statements]", () => {
     expect(response.status).toBe(201);
   })
 
-  test("Should not be able to create a withdraw statement without token", async () => {
+  it("Should not be able to create a withdraw statement without token", async () => {
     const response = await request(app).post("/api/v1/statements/withdraw").send({
       amount: 100,
       description: "withdraw",
@@ -176,7 +176,7 @@ describe("[/statements]", () => {
     expect(response.status).toBe(401);
   })
 
-  test("Should not be able to create a withdraw statement with insufficient balance", async () => {
+  it("Should not be able to create a withdraw statement with insufficient balance", async () => {
     const userToCreate = {
       name: String(Math.random()),
       email: String(Math.random()) + "@gmail.com",
@@ -199,7 +199,7 @@ describe("[/statements]", () => {
     expect(response.status).toBe(400);
   })
 
-  test("Should be able to get a user's balance", async () => {
+  it("Should be able to get a user's balance", async () => {
     const userToCreate = {
       name: String(Math.random()),
       email: String(Math.random()) + "@gmail.com",
@@ -214,6 +214,43 @@ describe("[/statements]", () => {
       description: "deposit",
     });
 
+    const response = await request(app).get("/api/v1/statements/balance").set("Authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.balance).toBe(100);
+  })
+
+  it("Should be able to get a correct user's balance considering deposits, withdraws and transfers", async () => {
+    const userToCreate = {
+      name: String(Math.random()),
+      email: String(Math.random()) + "@gmail.com",
+      password: "123456"
+    }
+    const userToCreate2 = {
+      name: String(Math.random()),
+      email: String(Math.random()) + "@gmail.com",
+      password: "123456"
+    }
+
+    await request(app).post("/api/v1/users").send(userToCreate);
+    await request(app).post("/api/v1/users").send(userToCreate2);
+
+    const sessionResponse = await request(app).post("/api/v1/sessions").send(userToCreate);
+    const token = sessionResponse.body.token;
+
+    const sessionResponse2 = await request(app).post("/api/v1/sessions").send(userToCreate2);
+    const user2Id = sessionResponse2.body.user.id;
+
+    await request(app).post("/api/v1/statements/deposit").set("Authorization", `Bearer ${token}`).send({
+      amount: 200,
+      description: "deposit",
+    });
+
+    await request(app).post(`/api/v1/statements/transfer/${user2Id}`).set("Authorization", `Bearer ${token}`).send({
+      amount: 50,
+      description: "transfer",
+    });
+
     await request(app).post("/api/v1/statements/withdraw").set("Authorization", `Bearer ${token}`).send({
       amount: 50,
       description: "withdraw",
@@ -222,15 +259,15 @@ describe("[/statements]", () => {
     const response = await request(app).get("/api/v1/statements/balance").set("Authorization", `Bearer ${token}`);
 
     expect(response.status).toBe(200);
-    expect(response.body.balance).toBe(50);
+    expect(response.body.balance).toBe(100);
   })
 
-  test("Should not be able to get a user's balance without token", async () => {
+  it("Should not be able to get a user's balance without token", async () => {
     const response = await request(app).get("/api/v1/statements/balance");
     expect(response.status).toBe(401);
   })
 
-  test("Should be able to get a user's statements by id", async () => {
+  it("Should be able to get a user's statements by id", async () => {
     const userToCreate = {
       name: String(Math.random()),
       email: String(Math.random()) + "@gmail.com",
@@ -255,9 +292,53 @@ describe("[/statements]", () => {
     expect(response.body.description).toBe("special deposit");
   })
 
-  test("Should not be able to get a user's statements by id without token", async () => {
+  it("Should not be able to get a user's statements by id without token", async () => {
     const response = await request(app).get("/api/v1/statements/123");
     expect(response.status).toBe(401);
+  })
+
+  it("Should be able to create a transfer statement by passing receiver id in path params", async () => {
+    const userToCreate = {
+      name: String(Math.random()),
+      email: String(Math.random()) + "@gmail.com",
+      password: "123456"
+    }
+    const userToCreate2 = {
+      name: String(Math.random()),
+      email: String(Math.random()) + "@gmail.com",
+      password: "123456"
+    }
+
+    await request(app).post("/api/v1/users").send(userToCreate);
+    await request(app).post("/api/v1/users").send(userToCreate2);
+
+    const sessionResponse = await request(app).post("/api/v1/sessions").send(userToCreate);
+    const token = sessionResponse.body.token;
+    const userId = sessionResponse.body.user.id;
+
+    const sessionResponse2 = await request(app).post("/api/v1/sessions").send(userToCreate2);
+    const user2Id = sessionResponse2.body.user.id;
+
+    await request(app).post("/api/v1/statements/deposit").set("Authorization", `Bearer ${token}`).send({
+      amount: 100,
+      description: "deposit",
+    });
+
+    const response = await request(app).post(`/api/v1/statements/transfer/${user2Id}`).set("Authorization", `Bearer ${token}`).send({
+      amount: 50,
+      description: "transfer",
+    });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({
+      sender_id: userId,
+      amount: 50,
+      description: "transfer",
+      type: "transfer",
+    })
+    expect(response.body).toHaveProperty("id");
+    expect(response.body).toHaveProperty("created_at");
+    expect(response.body).toHaveProperty("updated_at");
   })
 
 })
