@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner, Table } from "typeorm";
+import { MigrationInterface, QueryRunner, Table, TableForeignKey } from "typeorm";
 
 export class accountsTable1616682561481 implements MigrationInterface {
 
@@ -16,6 +16,11 @@ export class accountsTable1616682561481 implements MigrationInterface {
           type: 'uuid',
         },
         {
+          name: 'sender_id',
+          type: 'uuid',
+          isNullable: true,
+        },
+        {
           name: 'description',
           type: 'varchar',
         },
@@ -28,7 +33,7 @@ export class accountsTable1616682561481 implements MigrationInterface {
         {
           name: 'type',
           type: 'enum',
-          enum: ['deposit', 'withdraw']
+          enum: ['deposit', 'withdraw', 'transfer'],
         },
         {
           name: 'created_at',
@@ -41,17 +46,24 @@ export class accountsTable1616682561481 implements MigrationInterface {
           default: 'now()'
         }
       ],
-      foreignKeys: [
-        {
-          name: 'statements',
-          columnNames: ['user_id'],
-          referencedTableName: 'users',
-          referencedColumnNames: ['id'],
-          onUpdate: 'CASCADE',
-          onDelete: 'CASCADE'
-        }
-      ]
     }))
+
+    await queryRunner.createForeignKey(
+      'statements',
+      new TableForeignKey({
+        columnNames: ['user_id'],
+        referencedTableName: 'users',
+        referencedColumnNames: ['id']
+      })
+    );
+    await queryRunner.createForeignKey(
+      'statements',
+      new TableForeignKey({
+        columnNames: ['sender_id'],
+        referencedTableName: 'users',
+        referencedColumnNames: ['id'],
+      })
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
