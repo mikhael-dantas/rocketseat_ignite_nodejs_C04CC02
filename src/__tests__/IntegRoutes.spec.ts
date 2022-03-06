@@ -15,9 +15,15 @@ import { sign } from 'jsonwebtoken';
 jest.setTimeout(15000)
 let connection: Connection;
 
-// setup public test variables for repositories
+// setup public test variables and functions for repositories
 let ormUsersRepository: Repository<User>;
 let ormStatementsRepository: Repository<Statement>;
+
+enum OperationType {
+  DEPOSIT = 'deposit',
+  WITHDRAW = 'withdraw',
+  TRANSFER = 'transfer',
+}
 
 async function createUserFromOrm(user: { name: string, email: string, password: string }) {
   const passwordHash = await hash(user.password, 8);
@@ -34,6 +40,40 @@ async function getTokenFromOrmUser(user: User) {
     subject: user.id,
     expiresIn: '1d',
   });
+}
+
+async function createDepositStatementFromOrm(user_id: string, amount: number) {
+  const statementToCreate = {
+    user_id,
+    amount,
+    type: OperationType.DEPOSIT,
+    description: "test deposit",
+  }
+
+  return await ormStatementsRepository.save(ormStatementsRepository.create(statementToCreate));
+}
+
+async function createWithdrawStatementFromOrm(user_id: string, amount: number) {
+  const statementToCreate = {
+    user_id,
+    amount,
+    type: OperationType.WITHDRAW,
+    description: "test deposit",
+  }
+
+  return await ormStatementsRepository.save(ormStatementsRepository.create(statementToCreate));
+}
+
+async function createTransferStatementFromOrm(user_id: string, receiver_id: string, amount: number) {
+  const statementToCreate = {
+    user_id: receiver_id,
+    sender_id: user_id,
+    amount,
+    type: OperationType.DEPOSIT,
+    description: "test deposit",
+  }
+
+  return await ormStatementsRepository.save(ormStatementsRepository.create(statementToCreate));
 }
 
 // stablish connections and setup tables
@@ -188,10 +228,7 @@ describe("[/statements]", () => {
     const createdUser = await createUserFromOrm(userToCreate);
     const token = await getTokenFromOrmUser(createdUser);
 
-    await request(app).post("/api/v1/statements/deposit").set("Authorization", `Bearer ${token}`).send({
-      amount: 100,
-      description: "deposit",
-    });
+    await createDepositStatementFromOrm(createdUser.id as string, 100);
 
     const response = await request(app).post("/api/v1/statements/withdraw").set("Authorization", `Bearer ${token}`).send({
       amount: 100,
@@ -219,10 +256,7 @@ describe("[/statements]", () => {
     const createdUser = await createUserFromOrm(userToCreate);
     const token = await getTokenFromOrmUser(createdUser);
 
-    await request(app).post("/api/v1/statements/deposit").set("Authorization", `Bearer ${token}`).send({
-      amount: 100,
-      description: "deposit",
-    });
+    await createDepositStatementFromOrm(createdUser.id as string, 100);
 
     const response = await request(app).post("/api/v1/statements/withdraw").set("Authorization", `Bearer ${token}`).send({
       amount: 200,
@@ -242,10 +276,7 @@ describe("[/statements]", () => {
     const createdUser = await createUserFromOrm(userToCreate);
     const token = await getTokenFromOrmUser(createdUser);
 
-    await request(app).post("/api/v1/statements/deposit").set("Authorization", `Bearer ${token}`).send({
-      amount: 100,
-      description: "deposit",
-    });
+    await createDepositStatementFromOrm(createdUser.id as string, 100);
 
     const response = await request(app).get("/api/v1/statements/balance").set("Authorization", `Bearer ${token}`);
 
@@ -268,22 +299,13 @@ describe("[/statements]", () => {
     const createdUser = await createUserFromOrm(userToCreate);
     const token = await getTokenFromOrmUser(createdUser);
 
+    const userId = createdUser.id
     const {id: user2Id } = await createUserFromOrm(userToCreate2);
 
-    await request(app).post("/api/v1/statements/deposit").set("Authorization", `Bearer ${token}`).send({
-      amount: 200,
-      description: "deposit",
-    });
-
-    await request(app).post(`/api/v1/statements/transfer/${user2Id}`).set("Authorization", `Bearer ${token}`).send({
-      amount: 50,
-      description: "transfer",
-    });
-
-    await request(app).post("/api/v1/statements/withdraw").set("Authorization", `Bearer ${token}`).send({
-      amount: 50,
-      description: "withdraw",
-    });
+    await createDepositStatementFromOrm(userId as string, 300);
+    await createWithdrawStatementFromOrm(userId as string, 50);
+    await createTransferStatementFromOrm(userId as string, user2Id as string, 200);
+    await createTransferStatementFromOrm(user2Id as string, userId as string, 50);
 
     const response = await request(app).get("/api/v1/statements/balance").set("Authorization", `Bearer ${token}`);
 
@@ -305,20 +327,12 @@ describe("[/statements]", () => {
 
     const createdUser = await createUserFromOrm(userToCreate);
     const token = await getTokenFromOrmUser(createdUser);
-
-    const statementCreationResponse = await request(app).post("/api/v1/statements/deposit").set("Authorization", `Bearer ${token}`).send({
-      amount: 100,
-      description: "special deposit",
-    });
-
-    const id = statementCreationResponse.body.id;
-    if (!id) {throw new Error("Statement id is not defined")};
+    const {id} = await createDepositStatementFromOrm(createdUser.id as string, 100);
 
     const response = await request(app).get(`/api/v1/statements/${id}`).set("Authorization", `Bearer ${token}`);
 
     expect(response.status).toBe(200);
     expect(response.body.id).toBe(id);
-    expect(response.body.description).toBe("special deposit");
   })
 
   it("Should not be able to get a user's statements by id without token", async () => {
@@ -343,10 +357,7 @@ describe("[/statements]", () => {
 
     const {id: user2Id} = await createUserFromOrm(userToCreate2);
 
-    await request(app).post("/api/v1/statements/deposit").set("Authorization", `Bearer ${token}`).send({
-      amount: 100,
-      description: "deposit",
-    });
+    await createDepositStatementFromOrm(userId as string, 100);
 
     const response = await request(app).post(`/api/v1/statements/transfer/${user2Id}`).set("Authorization", `Bearer ${token}`).send({
       amount: 50,
