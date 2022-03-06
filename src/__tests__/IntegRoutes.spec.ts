@@ -39,21 +39,13 @@ async function getTokenFromOrmUser(user: User) {
 // stablish connections and setup tables
 beforeAll(async () => {
   connection = await createConnection();
-  await connection.dropDatabase();
-  await connection.runMigrations();
 
   // setup repositories
   ormUsersRepository = getRepository(User);
   ormStatementsRepository = getRepository(Statement);
 });
 
-beforeEach(async () => {
-  await connection.dropDatabase();
-  await connection.runMigrations();
-});
-
 afterAll(async () => {
-  await connection.dropDatabase();
   await connection.close();
 });
 

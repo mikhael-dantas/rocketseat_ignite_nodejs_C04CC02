@@ -33,10 +33,6 @@ beforeAll(async () => {
   // stablish connections and setup tables
   connection = await createConnection();
 
-
-  await connection.dropDatabase();
-  await connection.runMigrations();
-
   // setup repositories
   ormUsersRepository = getRepository(User);
   ormStatementsRepository = getRepository(Statement);
@@ -94,7 +90,6 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await connection.dropDatabase();
   await connection.close();
 });
 
