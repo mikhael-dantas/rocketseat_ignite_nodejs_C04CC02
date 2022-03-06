@@ -12,7 +12,6 @@ import { hash } from 'bcryptjs';
 import { sign } from 'jsonwebtoken';
 
 // setup public it variables and timeout value
-jest.setTimeout(15000)
 let connection: Connection;
 
 // setup public test variables and functions for repositories

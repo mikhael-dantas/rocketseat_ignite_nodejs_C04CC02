@@ -1,6 +1,3 @@
-// setting timeout for the test to run with database connection timing
-jest.setTimeout(10000);
-
 import {
   Connection, createConnection, getRepository, Repository,
 } from 'typeorm';
